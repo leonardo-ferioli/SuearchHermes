@@ -266,6 +266,8 @@ web:
 
 ### Plugin properties
 
+#### agy (binary)
+
 | Property | Value |
 |---|---|
 | `name` | `agy` |
@@ -273,6 +275,32 @@ web:
 | `supports_search` | ✅ Yes |
 | `supports_extract` | ❌ No (agy doesn't do page extraction) |
 | `is_available()` | Checks for `agy` binary at `~/.local/bin/agy` or in `PATH` |
+
+#### agy-oauth (direct API)
+
+| Property | Value |
+|---|---|
+| `name` | `agy-oauth` |
+| `display_name` | `Google via Antigravity OAuth` |
+| `supports_search` | ✅ Yes |
+| `supports_extract` | ❌ No |
+| `is_available()` | Checks for valid OAuth tokens in `~/.config/antigravity/tokens.json` |
+
+**agy-oauth** calls the Google Gemini API directly using OAuth tokens — no `agy` binary required. To use it:
+
+```bash
+# 1. Get the OAuth URL
+python3 -c "from plugins.web.agy.oauth_provider import get_auth_url; url, _, _ = get_auth_url(); print(url)"
+
+# 2. Open the URL in your browser, authorize, copy the code
+
+# 3. Complete login
+python3 -c "from plugins.web.agy.oauth_provider import complete_login; complete_login('<code>', '<code_verifier>')"
+
+# 4. Configure Hermes
+echo 'web:
+  search_backend: agy-oauth' >> ~/.hermes/config.yaml
+```
 
 ### How agy is invoked
 
@@ -331,7 +359,8 @@ SuearchHermes/
     └── web/
         └── agy/
             ├── __init__.py             # Plugin registration
-            └── provider.py             # AgYWebSearchProvider
+            ├── provider.py             # AgYWebSearchProvider (binary)
+            └── oauth_provider.py       # AgYOAuthWebSearchProvider (direct API)
 ```
 
 ### Plugin interface
@@ -355,7 +384,7 @@ class AgYWebSearchProvider(WebSearchProvider):
 
 ```
 ~/.hermes/
-├── config.yaml                          # web.search_backend: agy
+├── config.yaml                          # web.search_backend: agy or agy-oauth
 └── hermes-agent/
     └── plugins/
         └── web/
@@ -368,7 +397,8 @@ class AgYWebSearchProvider(WebSearchProvider):
             ├── tavily/                  # built-in
             └── agy/                     # ← SuearchHermes installs here
                 ├── __init__.py
-                └── provider.py
+                ├── provider.py          # Binary mode (agy -p)
+                └── oauth_provider.py    # OAuth mode (direct API)
 ```
 
 ---
@@ -376,11 +406,11 @@ class AgYWebSearchProvider(WebSearchProvider):
 ## 🛣️ Roadmap
 
 - [x] v1.0.0 — Core plugin, installer, docs
-- [ ] **v1.1.0** — Extract support (page content extraction via agy)
-- [ ] **v1.2.0** — Configurable prompt template (let users customize the agy prompt)
-- [ ] **v1.3.0** — Response caching (avoid repeated searches within a session)
-- [ ] **v1.4.0** — Rate limit awareness (detect agy quota limits and surface gracefully)
-- [ ] **v2.0.0** — Direct Gemini API integration (bypass agy CLI, use OAuth tokens directly)
+- [x] **v1.1.0** — Direct Gemini API integration via OAuth (bypass agy CLI)
+- [ ] **v1.2.0** — Extract support (page content extraction via agy)
+- [ ] **v1.3.0** — Configurable prompt template (let users customize the agy prompt)
+- [ ] **v1.4.0** — Response caching (avoid repeated searches within a session)
+- [ ] **v1.5.0** — Rate limit awareness (detect agy quota limits and surface gracefully)
 
 ---
 
@@ -389,7 +419,7 @@ class AgYWebSearchProvider(WebSearchProvider):
 After installation, run these checks:
 
 ```bash
-# 1. Plugin loads
+# 1. Plugin loads (binary mode)
 cd ~/.hermes/hermes-agent
 ./venv/bin/python -c "
 from plugins.web.agy.provider import AgYWebSearchProvider
@@ -405,11 +435,36 @@ print(f'supports_extract: {p.supports_extract()}')
 # supports_search: True
 # supports_extract: False
 
-# 2. Search works
+# 2. Plugin loads (OAuth mode)
+./venv/bin/python -c "
+from plugins.web.agy.oauth_provider import AgYOAuthWebSearchProvider
+p = AgYOAuthWebSearchProvider()
+print(f'name: {p.name}')
+print(f'available: {p.is_available()}')
+print(f'supports_search: {p.supports_search()}')
+print(f'supports_extract: {p.supports_extract()}')
+"
+# Expected:
+# name: agy-oauth
+# available: True (if tokens exist)
+# supports_search: True
+# supports_extract: False
+
+# 3. Search works (binary mode)
 ./venv/bin/python -c "
 import json
 from plugins.web.agy.provider import AgYWebSearchProvider
 p = AgYWebSearchProvider()
+r = p.search('latest stable version of rust', limit=5)
+print(json.dumps(r, indent=2))
+"
+# Expected: {"success": true, "data": {"web": [...]}}
+
+# 4. Search works (OAuth mode)
+./venv/bin/python -c "
+import json
+from plugins.web.agy.oauth_provider import AgYOAuthWebSearchProvider
+p = AgYOAuthWebSearchProvider()
 r = p.search('latest stable version of rust', limit=5)
 print(json.dumps(r, indent=2))
 "
@@ -453,7 +508,7 @@ For AI agents contributing to this repo, see [AGENT_CONTRIBUTOR_GUIDE.md](./AGEN
 | Requirement | Version | Notes |
 |---|---|---|
 | Hermes Agent | any (with plugin system, post-PR #25182) | `~/.hermes/hermes-agent/` |
-| Antigravity CLI | 1.1.0+ | `curl -fsSL https://antigravity.google/cli/install.sh \| bash` |
+| Antigravity CLI | 1.1.0+ | Only for `agy` mode. `agy-oauth` mode doesn't need it |
 | Python | 3.10+ | comes with Hermes |
 | OS | Linux, macOS | wherever `agy` runs |
 | Google account | any | for agy OAuth (free) |

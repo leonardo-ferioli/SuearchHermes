@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "suearchhermes"
-version = "1.0.0"
+version = "1.1.0"
 description = "Free Google Search plugin for Hermes Agent via Antigravity CLI (agy) — no API key"
 readme = "README.md"
 license = { text = "MIT" }

@@ -5,6 +5,26 @@ All notable changes to SuearchHermes will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.1.0] - 2026-07-14
+
+### Added
+- `AgYOAuthWebSearchProvider` — direct Gemini API integration via OAuth
+- No `agy` binary required — uses OAuth tokens directly with Google Gemini API
+- OAuth flow: PKCE + authorization code + token refresh
+- Token storage in `~/.config/antigravity/tokens.json`
+- Automatic token refresh when expired
+- New config option: `web.search_backend: agy-oauth`
+
+### Changed
+- Updated `__init__.py` to register both `agy` and `agy-oauth` providers
+- Updated documentation with OAuth provider setup instructions
+- Updated roadmap to mark v1.1.0 as completed
+
+### Notes
+- `agy-oauth` mode doesn't require Antigravity CLI binary
+- Tokens are stored locally and refreshed automatically
+- Same Google Search Grounding quality as `agy` mode
+
 ## [1.0.0] - 2026-07-14
 
 ### Added
