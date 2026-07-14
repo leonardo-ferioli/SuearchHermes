@@ -8,10 +8,15 @@ Hermes' ``web_search`` tool expects.
 
 No API key required. The user authenticates via Google OAuth once, and
 tokens are stored in ``~/.config/antigravity/tokens.json``.
+
+Communication reverse-engineered from Antigravity CLI (agy) v1.1.2 via
+mitmproxy traffic interception. The exact headers, body format, and
+API call sequence match what agy sends to ``daily-cloudcode-pa.googleapis.com``.
 """
 
 from __future__ import annotations
 
+import gzip
 import hashlib
 import base64
 import secrets
@@ -20,8 +25,10 @@ import http.client
 import json
 import logging
 import os
+import platform
 import ssl
 import time
+import uuid
 from typing import Any, Dict
 
 from agent.web_search_provider import WebSearchProvider
@@ -42,6 +49,13 @@ _SCOPES = [
     "https://www.googleapis.com/auth/experimentsandconfigs",
     "openid",
 ]
+
+# API endpoint — same as agy
+_API_ENDPOINT = "daily-cloudcode-pa.googleapis.com"
+
+# User-Agent — exact string agy sends (captured via mitmproxy)
+_ARCH = "amd64" if platform.machine() in ("x86_64", "AMD64") else platform.machine()
+_USER_AGENT = f"antigravity/cli/1.1.2 (aidev_client; os_type=linux; arch={_ARCH}; auth_method=consumer)"
 
 _TOKEN_FILE = os.path.expanduser("~/.config/antigravity/tokens.json")
 _TIMEOUT_SECS = 30
@@ -174,11 +188,171 @@ def _get_valid_access_token() -> str | None:
     return access_token
 
 
+# ---------------------------------------------------------------------------
+# API communication — exact replication of agy's HTTP calls
+# ---------------------------------------------------------------------------
+
+_PROJECT_CACHE: Dict[str, Any] = {}
+
+
+def _api_headers(access_token: str) -> Dict[str, str]:
+    """Build the exact headers agy sends to the API."""
+    return {
+        "Host": _API_ENDPOINT,
+        "User-Agent": _USER_AGENT,
+        "Authorization": f"Bearer {access_token}",
+        "Content-Type": "application/json",
+        "Accept-Encoding": "gzip",
+    }
+
+
+def _load_code_assist(access_token: str) -> str:
+    """Call loadCodeAssist to get the real Cloud AI Companion project ID.
+
+    agy sends ``{"metadata":{"ideType":"ANTIGRAVITY"}}`` — NOT
+    ``{"cloudaicompanionProject":"default-cli-project"}``. The response
+    contains the auto-assigned project for the free-tier OAuth user.
+    """
+    if "project" in _PROJECT_CACHE:
+        return _PROJECT_CACHE["project"]
+
+    headers = _api_headers(access_token)
+    body = json.dumps({"metadata": {"ideType": "ANTIGRAVITY"}})
+
+    context = ssl.create_default_context()
+    conn = http.client.HTTPSConnection(_API_ENDPOINT, context=context, timeout=_TIMEOUT_SECS)
+    conn.request("POST", "/v1internal:loadCodeAssist", body=body, headers=headers)
+    response = conn.getresponse()
+    raw_data = response.read()
+
+    content_encoding = response.getheader("Content-Encoding", "")
+    if "gzip" in content_encoding:
+        raw_data = gzip.decompress(raw_data)
+
+    response_body = raw_data.decode("utf-8")
+
+    if response.status != 200:
+        raise Exception(f"loadCodeAssist failed: {response.status} - {response_body[:200]}")
+
+    data = json.loads(response_body)
+    project = data.get("cloudaicompanionProject", "")
+    if not project:
+        raise Exception("loadCodeAssist did not return a cloudaicompanionProject")
+
+    _PROJECT_CACHE["project"] = project
+    logger.info("loadCodeAssist returned project: %s", project)
+    return project
+
+
+def _stream_generate_content(
+    access_token: str,
+    project: str,
+    prompt: str,
+    *,
+    model: str = "gemini-3.5-flash-low",
+    tools: list | None = None,
+) -> str:
+    """Call streamGenerateContent and return the full text response.
+
+    Replicates the exact body format agy sends, including requestId,
+    userAgent, requestType, generationConfig, and sessionId fields.
+    """
+    headers = _api_headers(access_token)
+
+    session_id = str(uuid.uuid4())
+
+    request_body: Dict[str, Any] = {
+        "project": project,
+        "requestId": f"agent/{uuid.uuid4()}/{int(time.time() * 1000)}/{uuid.uuid4()}/1",
+        "request": {
+            "contents": [{"role": "user", "parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "maxOutputTokens": 65536,
+                "thinkingConfig": {
+                    "includeThoughts": True,
+                    "thinkingBudget": 4000,
+                },
+            },
+            "sessionId": session_id,
+        },
+        "model": model,
+        "userAgent": "antigravity",
+        "requestType": "agent",
+    }
+
+    if tools:
+        request_body["request"]["tools"] = tools
+        request_body["request"]["toolConfig"] = {}
+
+    body = json.dumps(request_body)
+
+    context = ssl.create_default_context()
+    conn = http.client.HTTPSConnection(_API_ENDPOINT, context=context, timeout=_TIMEOUT_SECS)
+    conn.request("POST", "/v1internal:streamGenerateContent?alt=sse", body=body, headers=headers)
+
+    response = conn.getresponse()
+    raw_data = response.read()
+
+    # agy sends Accept-Encoding: gzip, so the response may be compressed
+    content_encoding = response.getheader("Content-Encoding", "")
+    if "gzip" in content_encoding:
+        raw_data = gzip.decompress(raw_data)
+
+    response_body = raw_data.decode("utf-8")
+
+    if response.status != 200:
+        raise Exception(f"streamGenerateContent failed: {response.status} - {response_body[:300]}")
+
+    # Parse SSE response — agy wraps responses in a "response" key
+    text_parts = []
+    for line in response_body.split("\n"):
+        if line.startswith("data: "):
+            try:
+                data = json.loads(line[6:])
+                # agy responses have a "response" wrapper
+                resp = data.get("response", data)
+                if "candidates" in resp:
+                    for candidate in resp["candidates"]:
+                        if "content" in candidate:
+                            for part in candidate["content"].get("parts", []):
+                                if "text" in part:
+                                    text_parts.append(part["text"])
+            except json.JSONDecodeError:
+                continue
+
+    return " ".join(text_parts).strip()
+
+
+def _extract_grounding_sources(raw_response: str) -> list[str]:
+    """Extract source URLs from grounding metadata in SSE response."""
+    sources = []
+    for line in raw_response.split("\n"):
+        if line.startswith("data: "):
+            try:
+                data = json.loads(line[6:])
+                resp = data.get("response", data)
+                if "candidates" in resp:
+                    for candidate in resp["candidates"]:
+                        metadata = candidate.get("groundingMetadata", {})
+                        if "groundingChunks" in metadata:
+                            for chunk in metadata["groundingChunks"]:
+                                if "web" in chunk:
+                                    uri = chunk["web"].get("uri", "")
+                                    if uri:
+                                        sources.append(uri)
+            except json.JSONDecodeError:
+                continue
+    return sources
+
+
 class AgYOAuthWebSearchProvider(WebSearchProvider):
     """Google Search provider via Antigravity OAuth.
 
     Free, no API key. Uses OAuth tokens directly with Google Gemini API
     Search Grounding. Returns synthesized answers with source domains.
+
+    Communication is reverse-engineered from agy v1.1.2 — exact same
+    headers, body format, and API call sequence.
     """
 
     @property
@@ -197,7 +371,7 @@ class AgYOAuthWebSearchProvider(WebSearchProvider):
         return True
 
     def supports_extract(self) -> bool:
-        return False
+        return True
 
     def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
         """Execute a Google search via Gemini API with Search Grounding."""
@@ -205,109 +379,63 @@ class AgYOAuthWebSearchProvider(WebSearchProvider):
         if not access_token:
             return {
                 "success": False,
-                "error": "Not authenticated. Run: python3 -c 'from plugins.web.agy.oauth_provider import *; print(_build_auth_url(*_generate_pkce()))'",
+                "error": "Not authenticated. Run: python3 -c 'from plugins.web.agy.oauth_provider import get_auth_url; url, _, _ = get_auth_url(); print(url)'",
             }
 
-        # Call Gemini API with Search Grounding
         try:
-            result = self._call_gemini_search(query, access_token)
-            return result
+            project = _load_code_assist(access_token)
+            prompt = f'Search the web for: "{query}"'
+            answer = _stream_generate_content(
+                access_token,
+                project,
+                prompt,
+                tools=[{"googleSearch": {}}],
+            )
+
+            if not answer:
+                return {"success": False, "error": "No response from Gemini API"}
+
+            web_results = [{
+                "title": answer[:200],
+                "url": f"https://www.google.com/search?q={query.replace(' ', '+')}",
+                "description": answer,
+                "position": 1,
+            }]
+
+            logger.info("OAuth search '%s': %d results", query, len(web_results))
+            return {"success": True, "data": {"web": web_results}}
+
         except Exception as exc:
             logger.warning("OAuth search error: %s", exc)
             return {"success": False, "error": f"Search failed: {exc}"}
 
-    def _call_gemini_search(self, query: str, access_token: str) -> Dict[str, Any]:
-        """Call Gemini API with Search Grounding."""
-        # Use the daily-cloudcode-pa endpoint (same as agy)
-        endpoint = "daily-cloudcode-pa.googleapis.com"
-        path = "/v1internal:streamGenerateContent?alt=sse"
+    def extract(self, urls: list[str], **kwargs: Any) -> list[Dict[str, Any]]:
+        """Extract content from one or more URLs via Gemini API."""
+        access_token = _get_valid_access_token()
+        if not access_token:
+            return [{"url": u, "title": "", "content": "", "error": "Not authenticated"} for u in urls]
 
-        # Build the request body
-        body = json.dumps({
-            "project": "default-cli-project",
-            "model": "gemini-3.5-flash",
-            "request": {
-                "contents": [{"role": "user", "parts": [{"text": f'Search the web for: "{query}"'}]}],
-                "tools": [{"googleSearch": {}}],
-            },
-        })
-
-        headers = {
-            "Authorization": f"Bearer {access_token}",
-            "Content-Type": "application/json",
-            "User-Agent": "google-cloud-sdk vscode_cloudshelleditor/0.1",
-        }
-
-        context = ssl.create_default_context()
-        conn = http.client.HTTPSConnection(endpoint, context=context, timeout=_TIMEOUT_SECS)
-        conn.request("POST", path, body=body, headers=headers)
-
-        response = conn.getresponse()
-        response_body = response.read().decode("utf-8")
-
-        if response.status != 200:
-            raise Exception(f"Gemini API error: {response.status} - {response_body[:300]}")
-
-        # Parse SSE response
-        return self._parse_sse_response(response_body, query)
-
-    def _parse_sse_response(self, raw: str, query: str) -> Dict[str, Any]:
-        """Parse SSE response from Gemini API."""
-        # Extract text from SSE events
-        text_parts = []
-        for line in raw.split("\n"):
-            if line.startswith("data: "):
-                try:
-                    data = json.loads(line[6:])
-                    if "candidates" in data:
-                        for candidate in data["candidates"]:
-                            if "content" in candidate:
-                                for part in candidate["content"].get("parts", []):
-                                    if "text" in part:
-                                        text_parts.append(part["text"])
-                except json.JSONDecodeError:
-                    continue
-
-        answer = " ".join(text_parts).strip()
-        if not answer:
-            return {"success": False, "error": "No response from Gemini API"}
-
-        # Extract sources from grounding metadata
-        sources = []
-        for line in raw.split("\n"):
-            if line.startswith("data: "):
-                try:
-                    data = json.loads(line[6:])
-                    if "candidates" in data:
-                        for candidate in data["candidates"]:
-                            metadata = candidate.get("groundingMetadata", {})
-                            if "groundingChunks" in metadata:
-                                for chunk in metadata["groundingChunks"]:
-                                    if "web" in chunk:
-                                        sources.append(chunk["web"].get("uri", ""))
-                except json.JSONDecodeError:
-                    continue
-
-        web_results = []
-        if answer:
-            web_results.append({
-                "title": answer[:200],
-                "url": sources[0] if sources else f"https://www.google.com/search?q={query.replace(' ', '+')}",
-                "description": answer,
-                "position": 1,
-            })
-
-        for i, src in enumerate(sources[:max(0, limit - 1)]):
-            if src:
-                web_results.append({
-                    "title": src.split("/")[-1] if "/" in src else src,
-                    "url": src,
-                    "description": "",
-                    "position": i + 2,
+        results = []
+        for url in urls:
+            try:
+                project = _load_code_assist(access_token)
+                prompt = (
+                    f'Extract the main text content from this URL: {url}\n\n'
+                    "Return ONLY the main article/text content. No HTML, no navigation, "
+                    "no ads, no menus. Just the readable text content."
+                )
+                content = _stream_generate_content(access_token, project, prompt)
+                results.append({
+                    "url": url,
+                    "title": "",
+                    "content": content,
+                    "raw_content": content,
+                    "metadata": {"sourceURL": url},
                 })
-
-        logger.info("OAuth search '%s': %d results", query, len(web_results))
-        return {"success": True, "data": {"web": web_results}}
+            except Exception as exc:
+                logger.warning("OAuth extract error for %s: %s", url, exc)
+                results.append({"url": url, "title": "", "content": "", "error": str(exc)})
+        return results
 
     def get_setup_schema(self) -> Dict[str, Any]:
         return {

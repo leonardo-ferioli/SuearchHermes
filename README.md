@@ -273,7 +273,7 @@ web:
 | `name` | `agy` |
 | `display_name` | `Google via Antigravity (agy)` |
 | `supports_search` | ✅ Yes |
-| `supports_extract` | ❌ No (agy doesn't do page extraction) |
+| `supports_extract` | ✅ Yes |
 | `is_available()` | Checks for `agy` binary at `~/.local/bin/agy` or in `PATH` |
 
 #### agy-oauth (direct API)
@@ -283,7 +283,7 @@ web:
 | `name` | `agy-oauth` |
 | `display_name` | `Google via Antigravity OAuth` |
 | `supports_search` | ✅ Yes |
-| `supports_extract` | ❌ No |
+| `supports_extract` | ✅ Yes |
 | `is_available()` | Checks for valid OAuth tokens in `~/.config/antigravity/tokens.json` |
 
 **agy-oauth** calls the Google Gemini API directly using OAuth tokens — no `agy` binary required. To use it:
@@ -407,7 +407,7 @@ class AgYWebSearchProvider(WebSearchProvider):
 
 - [x] v1.0.0 — Core plugin, installer, docs
 - [x] **v1.1.0** — Direct Gemini API integration via OAuth (bypass agy CLI)
-- [ ] **v1.2.0** — Extract support (page content extraction via agy)
+- [x] **v1.2.0** — Extract support (page content extraction via agy and OAuth)
 - [ ] **v1.3.0** — Configurable prompt template (let users customize the agy prompt)
 - [ ] **v1.4.0** — Response caching (avoid repeated searches within a session)
 - [ ] **v1.5.0** — Rate limit awareness (detect agy quota limits and surface gracefully)

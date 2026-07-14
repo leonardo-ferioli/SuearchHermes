@@ -16,7 +16,7 @@ import logging
 import os
 import shutil
 import subprocess
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from agent.web_search_provider import WebSearchProvider
 
@@ -60,7 +60,7 @@ class AgYWebSearchProvider(WebSearchProvider):
         return True
 
     def supports_extract(self) -> bool:
-        return False
+        return True
 
     def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
         """Execute a Google search via agy and return normalized results."""
@@ -129,6 +129,45 @@ class AgYWebSearchProvider(WebSearchProvider):
 
         logger.info("agy search '%s': %d results", query, len(web_results))
         return {"success": True, "data": {"web": web_results}}
+
+    def extract(self, urls: list[str], **kwargs: Any) -> list[Dict[str, Any]]:
+        """Extract content from one or more URLs via agy."""
+        agy_path = _find_agy()
+        if not agy_path:
+            return [{"url": u, "title": "", "content": "", "error": "agy binary not found"} for u in urls]
+
+        results = []
+        for url in urls:
+            prompt = (
+                f'Extract the main text content from this URL: {url}\n\n'
+                "Return ONLY the main article/text content. No HTML, no navigation, "
+                "no ads, no menus. Just the readable text content."
+            )
+            try:
+                result = subprocess.run(
+                    [agy_path, "-p", prompt, "--dangerously-skip-permissions"],
+                    capture_output=True,
+                    text=True,
+                    timeout=_AGY_TIMEOUT_SECS,
+                    env={**os.environ, "PATH": os.path.expanduser("~/.local/bin") + ":" + os.environ.get("PATH", "")},
+                )
+                content = (result.stdout or "").strip()
+                if content:
+                    results.append({
+                        "url": url,
+                        "title": "",
+                        "content": content,
+                        "raw_content": content,
+                        "metadata": {"sourceURL": url},
+                    })
+                else:
+                    results.append({"url": url, "title": "", "content": "", "error": "Empty response from agy"})
+            except subprocess.TimeoutExpired:
+                results.append({"url": url, "title": "", "content": "", "error": f"agy timed out after {_AGY_TIMEOUT_SECS}s"})
+            except Exception as exc:
+                results.append({"url": url, "title": "", "content": "", "error": str(exc)})
+
+        return results
 
     def get_setup_schema(self) -> Dict[str, Any]:
         return {
