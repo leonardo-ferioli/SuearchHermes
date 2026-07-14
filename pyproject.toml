@@ -1,0 +1,50 @@
+[build-system]
+requires = ["setuptools>=64", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "suearchhermes"
+version = "1.0.0"
+description = "Free Google Search plugin for Hermes Agent via Antigravity CLI (agy) — no API key"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Leonardo Ferioli", email = "leonardo.ferioli.12@gmail.com" }]
+requires-python = ">=3.10"
+keywords = [
+    "hermes",
+    "hermes-agent",
+    "google-search",
+    "agy",
+    "antigravity",
+    "web-search",
+    "gemini",
+    "search-grounding",
+    "no-api-key",
+    "tavily-alternative",
+    "firecrawl-alternative",
+    "duckduckgo-alternative",
+    "nous-research",
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Internet :: WWW/HTTP :: Indexing/Search",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/leonardo-ferioli/SuearchHermes"
+Repository = "https://github.com/leonardo-ferioli/SuearchHermes"
+Documentation = "https://github.com/leonardo-ferioli/SuearchHermes#readme"
+"Bug Tracker" = "https://github.com/leonardo-ferioli/SuearchHermes/issues"
+Changelog = "https://github.com/leonardo-ferioli/SuearchHermes/blob/main/CHANGELOG.md"
+
+[tool.setuptools.packages.find]
+where = ["plugins"]
+include = ["web.agy"]

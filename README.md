@@ -1,10 +1,12 @@
+**English** | [Español](./README_es.md) | [中文](./README_zh.md)
+
 <div align="center">
 
 <img src="assets/banner.svg" alt="SuearchHermes" width="720"/>
 
 # SuearchHermes
 
-**Google Search via Antigravity (agy) for Hermes Agent — Free, No API Key**
+**Free Google Search for Hermes Agent — No API Key, No Billing, Real Google Results**
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?style=flat&logo=python&logoColor=white)](https://www.python.org/)
 [![Hermes](https://img.shields.io/badge/Hermes-Agent-6E40C9?style=flat&logo=gnometerminal&logoColor=white)](https://github.com/NousResearch/hermes-agent)
@@ -12,8 +14,13 @@
 [![License](https://img.shields.io/badge/License-MIT-yellow?style=flat)](./LICENSE)
 [![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS-blue?style=flat&logo=linux&logoColor=white)]()
 [![Price](https://img.shields.io/badge/Cost-Free%20%E2%80%A2%20No%20API%20Key-brightgreen?style=flat)]()
+[![Release](https://img.shields.io/badge/Release-v1.0.0-blue?style=flat)](https://github.com/leonardo-ferioli/SuearchHermes/releases/tag/v1.0.0)
+[![CI](https://github.com/leonardo-ferioli/SuearchHermes/actions/workflows/ci.yml/badge.svg)](https://github.com/leonardo-ferioli/SuearchHermes/actions)
+[![GitHub stars](https://img.shields.io/github/stars/leonardo-ferioli/SuearchHermes?style=flat&color=yellow)](https://github.com/leonardo-ferioli/SuearchHermes/stargazers)
+[![GitHub issues](https://img.shields.io/github/issues/leonardo-ferioli/SuearchHermes?style=flat&color=red)](https://github.com/leonardo-ferioli/SuearchHermes/issues)
+[![Last commit](https://img.shields.io/github/last-commit/leonardo-ferioli/SuearchHermes?style=flat&color=orange)](https://github.com/leonardo-ferioli/SuearchHermes/commits)
 
-[Features](#-features) · [Why](#-why) · [How It Works](#-how-it-works) · [Quick Start](#-quick-start) · [Manual Install](#-manual-install) · [Configuration](#-configuration) · [Architecture](#-architecture) · [Uninstall](#-uninstall) · [Contributing](#-contributing)
+[Features](#-key-features) · [Why](#-why) · [Demo](#-demo) · [Quick Start](#-quick-start) · [Examples](#-examples) · [Architecture](#-architecture) · [Roadmap](#-roadmap) · [Contributing](#-contributing) · [Changelog](./CHANGELOG.md)
 
 </div>
 
@@ -21,7 +28,14 @@
 
 ## 📰 News
 
-- **2026-07-14** 🚀 **v1.0.0 released**: Initial public release. Google Search via Antigravity CLI (agy) plugin for Hermes Agent. Free, no API key, Google Search Grounding via Gemini. Includes one-command installer, full Hermes `WebSearchProvider` ABC implementation, and automatic config wiring.
+- **2026-07-14** 🚀 **v1.0.0 released**: Initial public release. Google Search via Antigravity CLI (agy) plugin for Hermes Agent. Free, no API key, Google Search Grounding via Gemini. Includes one-command installer, full Hermes `WebSearchProvider` ABC implementation, and automatic config wiring. ([Release notes](https://github.com/leonardo-ferioli/SuearchHermes/releases/tag/v1.0.0))
+
+<details>
+<summary><b>Earlier news</b></summary>
+
+- **2026-07-14** 🎉 **Project created**: SuearchHermes born from the frustration of Hermes' built-in web search backends being either paid (Tavily, Firecrawl, Exa) or low quality (DuckDuckGo). Decided to use Google's own Antigravity CLI as the backend.
+
+</details>
 
 ---
 
@@ -29,61 +43,85 @@
 
 Hermes Agent ships with `web_search` support, but the built-in backends all have problems:
 
-| Backend | Cost | Problem |
-|---|---|---|
-| **Firecrawl** | 💰 Paid | API key required, billing per request |
-| **Tavily** | 💰 Paid | API key required, limited free tier |
-| **Exa** | 💰 Paid | API key required |
-| **Parallel** | 💰 Paid | API key required |
-| **Brave (free)** | ⚠️ Limited | 2,000 queries/month, requires API key |
-| **DDGS** | ✅ Free | Poor quality, rate-limited, often blocked, no synthesis |
+| Backend | Cost | API Key | Quality | Problem |
+|---|---|---|---|---|
+| **Firecrawl** | 💰 Paid | Required | ⭐⭐⭐⭐ | Billing per request |
+| **Tavily** | 💰 Paid | Required | ⭐⭐⭐⭐ | Limited free tier |
+| **Exa** | 💰 Paid | Required | ⭐⭐⭐ | API key required |
+| **Parallel** | 💰 Paid | Required | ⭐⭐⭐ | API key required |
+| **Brave (free)** | ⚠️ Limited | Required | ⭐⭐⭐ | 2,000 queries/month |
+| **DDGS** | ✅ Free | None | ⭐ | Poor quality, rate-limited, blocked |
+| **SuearchHermes** | ✅ Free | **None** | ⭐⭐⭐⭐⭐ | **Uses Google via Gemini** |
 
 **SuearchHermes** replaces all of that with `agy` — Google's own Antigravity CLI — which has **Google Search Grounding** built in via Gemini.
 
-| SuearchHermes | |
+| | SuearchHermes |
 |---|---|
 | **Cost** | Free, forever |
 | **API key** | None — uses your Google account OAuth |
 | **Search engine** | Google (via Gemini Search Grounding) |
 | **Result quality** | Synthesized answers + cited source domains |
 | **Rate limit** | Subject to agy/Gemini fair use |
+| **Setup time** | 30 seconds |
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-- 🔍 **Real Google Search** — via Gemini Search Grounding, not scraping
-- 🆓 **Zero cost** — no API key, no billing, no credit card
-- 🧠 **Synthesized answers** — Gemini reads the results and gives you a concise answer with sources
-- 🔌 **Drop-in Hermes plugin** — implements the `WebSearchProvider` ABC, integrates natively
-- ⚡ **One-command install** — `./install.sh` does everything
-- 🔄 **Auto config** — wires `web.search_backend: agy` into `config.yaml` automatically
-- 🌐 **Source domains** — returns clean domain names, not redirect URLs
-- 🖥️ **Cross-platform** — Linux, macOS (wherever agy runs)
+### 🔍 Real Google Search
+
+Not scraping. Not a SERP API. Actual Google Search Grounding via Gemini — the same grounding API that powers Gemini's own "search the web" capability. Gemini reads the results, synthesizes a concise answer, and returns source domains.
+
+### 🆓 Zero Cost, Zero API Keys
+
+Uses your existing `agy` OAuth session — the one you already created when you ran `agy` and logged in with your Google account. No `BRAVE_SEARCH_API_KEY`, no `TAVILY_API_KEY`, no `FIRECRAWL_API_KEY`, no credit card, no Cloud Console.
+
+### 🔌 Drop-in Hermes Plugin
+
+Implements Hermes' `WebSearchProvider` ABC — the same interface that `ddgs`, `brave-free`, `firecrawl`, `tavily`, `exa`, `parallel`, and `searxng` implement. No monkey-patching, no fork, no core edits.
+
+### ⚡ One-Command Install
+
+`./install.sh` copies the plugin, verifies `agy` is installed, and wires `web.search_backend: agy` into your `config.yaml`.
+
+### 🌐 Clean Source Domains
+
+Returns clean domain names (`github.com`, `rust-lang.org`), not opaque `vertexaisearch.cloud.google.com/grounding-api-redirect/...` URLs.
+
+### 🖥️ Cross-Platform
+
+Linux, macOS — wherever `agy` runs.
 
 ---
 
-## 🏗️ How It Works
+## 🎬 Demo
+
+After installing SuearchHermes, just ask Hermes to search:
 
 ```
-┌─────────┐     ┌──────────┐     ┌───────────────┐     ┌────────────┐     ┌──────────┐
-│  User   │────▶│  Hermes  │────▶│ SuearchHermes │────▶│    agy     │────▶│  Google  │
-│ "busca" │     │ web_search│     │   (plugin)    │     │   -p       │     │ Grounding│
-└─────────┘     └──────────┘     └───────────────┘     └────────────┘     └──────────┘
-                                          │                                      │
-                                          │     ┌──────────────────────────┐      │
-                                          └────▶│ Synthesized answer +     │◀─────┘
-                                                │ source domains (JSON)    │
-                                                └──────────────────────────┘
+> search for the latest rust version
+
+Hermes: The latest stable version of Rust is 1.97.0, released on July 9, 2026.
+         Sources: rust-lang.org, releases.rs
 ```
 
-1. User asks Hermes to search → Hermes calls `web_search("query")`
-2. `web_search` checks `config.yaml` → finds `search_backend: agy`
-3. SuearchHermes plugin receives the query
-4. Plugin calls `agy -p "Search the web for: query..."` with a structured prompt
-5. `agy` uses Google Search Grounding via Gemini to search + synthesize
-6. Plugin parses the response → normalizes to Hermes' `{"web": [...]}` format
-7. Hermes receives results as if it were any other backend
+```
+> investiga sobre rust9x
+
+Hermes: Rust9x is an unofficial fork of the Rust compiler that restores
+         compatibility for Windows 9x/ME/NT/2000/XP/Vista. It provides custom
+         target triples and API fallbacks for legacy systems.
+         Sources: github.com, seri.tools, reddit.com
+```
+
+```
+> what does the internet say about Hermes Agent Nous Research
+
+Hermes: Hermes Agent by Nous Research is an open-source autonomous AI agent
+         platform with a CLI, TUI, persistent memory, tool integration, and
+         connectivity with messaging channels.
+         Sources: hermes-agent.org, nousresearch.com, github.com
+```
 
 ---
 
@@ -122,11 +160,7 @@ That's it. The script will:
 ```bash
 cd ~/.hermes/hermes-agent
 ./venv/bin/python -c "from plugins.web.agy.provider import AgYWebSearchProvider; p = AgYWebSearchProvider(); print(p.name, p.is_available())"
-```
-
-Expected output:
-```
-agy True
+# Expected: agy True
 ```
 
 ### Use
@@ -144,30 +178,75 @@ Hermes will use Google via agy automatically. No extra commands needed.
 
 ---
 
+## 📝 Examples
+
+### Example 1: Version check
+
+```
+> search for the latest stable version of rust
+```
+
+**Result:**
+```json
+{
+  "success": true,
+  "data": {
+    "web": [
+      {"title": "Rust 1.97.0 released July 9, 2026", "url": "rust-lang.org", "description": "The latest stable version of Rust is 1.97.0...", "position": 1},
+      {"title": "rust-lang.org", "url": "https://rust-lang.org", "description": "", "position": 2},
+      {"title": "releases.rs", "url": "https://releases.rs", "description": "", "position": 3}
+    ]
+  }
+}
+```
+
+### Example 2: Research
+
+```
+> research rust9x windows xp fork
+```
+
+**Result:**
+```json
+{
+  "success": true,
+  "data": {
+    "web": [
+      {"title": "Rust9x is an unofficial fork...", "url": "github.com", "description": "Rust9x restores compatibility for Windows 9x/ME/NT/2000/XP/Vista", "position": 1},
+      {"title": "github.com", "url": "https://github.com", "description": "", "position": 2},
+      {"title": "seri.tools", "url": "https://seri.tools", "description": "", "position": 3}
+    ]
+  }
+}
+```
+
+### Example 3: Multi-language queries
+
+SuearchHermes works with queries in any language — Gemini processes them natively:
+
+```
+> busca: mejores frameworks de Python 2026
+> 搜索: Rust Windows XP 支持
+> recherche: version la plus récente de Rust
+```
+
+---
+
 ## 🔧 Manual Install
 
 If you prefer to do it manually:
 
-### 1. Copy plugin files
-
 ```bash
+# 1. Copy plugin files
 mkdir -p ~/.hermes/hermes-agent/plugins/web/agy
 cp plugins/web/agy/__init__.py  ~/.hermes/hermes-agent/plugins/web/agy/
 cp plugins/web/agy/provider.py  ~/.hermes/hermes-agent/plugins/web/agy/
-```
 
-### 2. Configure Hermes
+# 2. Configure Hermes — add to ~/.hermes/config.yaml
+echo 'web:
+  search_backend: agy' >> ~/.hermes/config.yaml
 
-Add this to your `~/.hermes/config.yaml`:
-
-```yaml
-web:
-  search_backend: agy
-```
-
-### 3. Restart Hermes
-
-```bash
+# 3. Restart Hermes
 hermes gateway restart
 ```
 
@@ -197,8 +276,6 @@ web:
 
 ### How agy is invoked
 
-The plugin calls `agy` with a structured prompt:
-
 ```bash
 agy -p "Search the web for: <query>
 
@@ -216,8 +293,7 @@ The response is parsed and normalized into Hermes' expected format:
   "success": true,
   "data": {
     "web": [
-      {"title": "...", "url": "...", "description": "...", "position": 1},
-      {"title": "...", "url": "...", "description": "", "position": 2}
+      {"title": "...", "url": "...", "description": "...", "position": 1}
     ]
   }
 }
@@ -232,15 +308,30 @@ The response is parsed and normalized into Hermes' expected format:
 ```
 SuearchHermes/
 ├── install.sh                          # One-command installer
-├── README.md                           # This file
+├── README.md                           # English docs (this file)
+├── README_es.md                        # Spanish docs
+├── README_zh.md                        # Chinese docs
+├── CHANGELOG.md                        # Version history
+├── CONTRIBUTING.md                     # Contribution guide
+├── AGENT_CONTRIBUTOR_GUIDE.md          # Guide for AI agents
+├── CODE_OF_CONDUCT.md                  # Community standards
+├── SECURITY.md                         # Security policy
 ├── LICENSE                             # MIT
+├── NOTICE                              # Third-party notices
+├── pyproject.toml                      # Python package metadata
 ├── assets/
-│   └── banner.svg                      # Logo banner
+│   ├── banner.svg                      # Logo banner
+│   └── social-preview.png              # OG/social preview image
+├── .github/
+│   ├── FUNDING.yml                     # Sponsorship
+│   ├── ISSUE_TEMPLATE/                 # Bug report + feature request
+│   └── workflows/
+│       └── ci.yml                      # CI checks
 └── plugins/
     └── web/
         └── agy/
-            ├── __init__.py             # Plugin registration (register(ctx))
-            └── provider.py             # AgYWebSearchProvider implementation
+            ├── __init__.py             # Plugin registration
+            └── provider.py             # AgYWebSearchProvider
 ```
 
 ### Plugin interface
@@ -282,6 +373,17 @@ class AgYWebSearchProvider(WebSearchProvider):
 
 ---
 
+## 🛣️ Roadmap
+
+- [x] v1.0.0 — Core plugin, installer, docs
+- [ ] **v1.1.0** — Extract support (page content extraction via agy)
+- [ ] **v1.2.0** — Configurable prompt template (let users customize the agy prompt)
+- [ ] **v1.3.0** — Response caching (avoid repeated searches within a session)
+- [ ] **v1.4.0** — Rate limit awareness (detect agy quota limits and surface gracefully)
+- [ ] **v2.0.0** — Direct Gemini API integration (bypass agy CLI, use OAuth tokens directly)
+
+---
+
 ## 🧪 Verification
 
 After installation, run these checks:
@@ -303,19 +405,7 @@ print(f'supports_extract: {p.supports_extract()}')
 # supports_search: True
 # supports_extract: False
 
-# 2. Plugin registers
-./venv/bin/python -c "
-from plugins.web.agy import register
-class FakeCtx:
-    def __init__(self): self.providers = []
-    def register_web_search_provider(self, p): self.providers.append(p)
-ctx = FakeCtx()
-register(ctx)
-print([p.name for p in ctx.providers])
-"
-# Expected: ['agy']
-
-# 3. Search works
+# 2. Search works
 ./venv/bin/python -c "
 import json
 from plugins.web.agy.provider import AgYWebSearchProvider
@@ -346,25 +436,15 @@ hermes gateway restart
 
 ## 🤝 Contributing
 
-Contributions are welcome. This is a small, focused plugin — keep it simple.
+Contributions are welcome! See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
 
-1. Fork the repo
-2. Create a branch (`git checkout -b feature/your-feature`)
-3. Commit changes (`git commit -m 'Add your feature'`)
-4. Push (`git push origin feature/your-feature`)
-5. Open a PR
+For AI agents contributing to this repo, see [AGENT_CONTRIBUTOR_GUIDE.md](./AGENT_CONTRIBUTOR_GUIDE.md).
 
-### Development setup
+### Contributors
 
-```bash
-git clone https://github.com/leonardo-ferioli/SuearchHermes.git
-cd SuearchHermes
-
-# Test the plugin against your local Hermes
-cp -r plugins/web/agy ~/.hermes/hermes-agent/plugins/web/agy
-
-# Run verification (see above)
-```
+<a href="https://github.com/leonardo-ferioli">
+  <img src="https://avatars.githubusercontent.com/u/221494455?v=4" width="50" height="50" alt="Leonardo Ferioli"/>
+</a>
 
 ---
 
@@ -391,6 +471,17 @@ MIT — see [LICENSE](./LICENSE)
 **Leonardo Ferioli**
 
 - GitHub: [@leonardo-ferioli](https://github.com/leonardo-ferioli)
+- Email: leonardo.ferioli.12@gmail.com
+
+---
+
+## ⭐ Star History
+
+<div align="center">
+
+[![Star History Chart](https://api.star-history.com/svg?repos=leonardo-ferioli/SuearchHermes&type=Date)](https://star-history.com/#leonardo-ferioli/SuearchHermes&Date)
+
+</div>
 
 ---
 
@@ -399,5 +490,7 @@ MIT — see [LICENSE](./LICENSE)
 **SuearchHermes** — Google Search, free, for Hermes Agent.
 
 Built because DuckDuckGo scraping and paid SERP APIs are not good enough.
+
+If this project helped you, consider ⭐ starring the repo.
 
 </div>
