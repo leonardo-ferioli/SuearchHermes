@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Check plugin loads
+        run: |
+          python -c "
+          import sys, importlib.util
+          # Load provider.py directly — no Hermes deps needed for syntax check
+          spec = importlib.util.spec_from_file_location('provider', 'plugins/web/agy/provider.py')
+          # Just verify the file is valid Python and has the class
+          import ast
+          with open('plugins/web/agy/provider.py') as f:
+              tree = ast.parse(f.read())
+          classes = [n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
+          assert 'AgYWebSearchProvider' in classes, 'AgYWebSearchProvider class not found'
+          print('✓ provider.py valid')
+          with open('plugins/web/agy/__init__.py') as f:
+              ast.parse(f.read())
+          print('✓ __init__.py valid')
+          with open('install.sh') as f:
+              content = f.read()
+              assert 'plugins/web/agy' in content
+              assert 'search_backend: agy' in content
+          print('✓ install.sh valid')
+          print('All checks passed')
+          "

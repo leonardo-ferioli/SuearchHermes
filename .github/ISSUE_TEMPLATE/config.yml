@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 Discussions
+    url: https://github.com/leonardo-ferioli/SuearchHermes/discussions
+    about: Ask questions, share ideas, or discuss use cases
+  - name: 📖 README
+    url: https://github.com/leonardo-ferioli/SuearchHermes#readme
+    about: Full documentation and install guide

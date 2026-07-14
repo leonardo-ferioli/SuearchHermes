@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 640" width="1280" height="640">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0D1117"/>
+      <stop offset="100%" stop-color="#161B22"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#4285F4"/>
+      <stop offset="50%" stop-color="#6E40C9"/>
+      <stop offset="100%" stop-color="#34D058"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="640" rx="0" fill="url(#bg)"/>
+  <rect x="0" y="0" width="1280" height="8" fill="url(#accent)"/>
+
+  <!-- Search icon (large) -->
+  <g transform="translate(120, 180)">
+    <circle cx="50" cy="50" r="38" fill="none" stroke="#4285F4" stroke-width="5"/>
+    <line x1="78" y1="78" x2="100" y2="100" stroke="#4285F4" stroke-width="5" stroke-linecap="round"/>
+  </g>
+
+  <!-- Title -->
+  <text x="120" y="360" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="72" font-weight="bold" fill="#F0F6FC">
+    SuearchHermes
+  </text>
+
+  <!-- Tagline -->
+  <text x="120" y="420" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="32" fill="#8B949E">
+    Free Google Search for Hermes Agent — No API Key
+  </text>
+
+  <!-- Feature points -->
+  <text x="120" y="490" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="24" fill="#34D058">
+    ✓ Real Google results via Gemini Search Grounding
+  </text>
+  <text x="120" y="530" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="24" fill="#34D058">
+    ✓ Replaces Tavily, Firecrawl, Brave, DuckDuckGo
+  </text>
+  <text x="120" y="570" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
+        font-size="24" fill="#34D058">
+    ✓ Drop-in plugin · One-command install
+  </text>
+
+  <!-- Badges -->
+  <g transform="translate(120, 120)">
+    <rect x="0" y="0" width="110" height="32" rx="4" fill="#1F6FEB"/>
+    <text x="55" y="22" font-family="sans-serif" font-size="16" fill="white" text-anchor="middle">Python</text>
+
+    <rect x="122" y="0" width="180" height="32" rx="4" fill="#6E40C9"/>
+    <text x="212" y="22" font-family="sans-serif" font-size="16" fill="white" text-anchor="middle">Hermes Agent</text>
+
+    <rect x="312" y="0" width="90" height="32" rx="4" fill="#238636"/>
+    <text x="357" y="22" font-family="sans-serif" font-size="16" fill="white" text-anchor="middle">MIT</text>
+
+    <rect x="412" y="0" width="140" height="32" rx="4" fill="#4285F4"/>
+    <text x="482" y="22" font-family="sans-serif" font-size="16" fill="white" text-anchor="middle">Google Search</text>
+  </g>
+</svg>
