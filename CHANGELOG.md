@@ -5,6 +5,17 @@ All notable changes to SuearchHermes will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-07-14
+
+### Added
+- Configurable prompt templates via `AGY_SEARCH_PROMPT` and `AGY_EXTRACT_PROMPT` env vars
+- Response caching with 5-minute TTL — avoids repeated API calls within a session
+- Rate limit awareness — checks `retrieveUserQuotaSummary` before search, surfaces reset time
+- Both providers (binary and OAuth) support all three features
+
+### Changed
+- Updated roadmap — all planned features through v1.5.0 are now complete
+
 ## [1.1.0] - 2026-07-14
 
 ### Added

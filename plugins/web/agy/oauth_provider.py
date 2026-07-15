@@ -60,6 +60,22 @@ _USER_AGENT = f"antigravity/cli/1.1.2 (aidev_client; os_type=linux; arch={_ARCH}
 _TOKEN_FILE = os.path.expanduser("~/.config/antigravity/tokens.json")
 _TIMEOUT_SECS = 30
 
+# v1.3.0 — Configurable prompt templates (overridable via env vars)
+_DEFAULT_SEARCH_PROMPT = 'Search the web for: "{query}"'
+_DEFAULT_EXTRACT_PROMPT = (
+    "Extract the main text content from this URL: {url}\n\n"
+    "Return ONLY the main article/text content. No HTML, no navigation, "
+    "no ads, no menus. Just the readable text content."
+)
+
+# v1.4.0 — Response caching
+_CACHE: Dict[str, Any] = {}
+_CACHE_TTL_SECS = 300  # 5 minutes
+
+# v1.5.0 — Rate limit awareness
+_QUOTA_CACHE: Dict[str, Any] = {}
+_QUOTA_REFRESH_SECS = 60
+
 
 def _generate_pkce() -> tuple[str, str]:
     """Generate PKCE code_verifier and code_challenge (S256)."""
@@ -345,6 +361,111 @@ def _extract_grounding_sources(raw_response: str) -> list[str]:
     return sources
 
 
+# ---------------------------------------------------------------------------
+# v1.3.0 — Configurable prompt templates
+# ---------------------------------------------------------------------------
+
+def _get_search_prompt(query: str) -> str:
+    """Build the search prompt, using a custom template if set.
+
+    Override with the ``AGY_SEARCH_PROMPT`` env var — ``{query}`` is
+    replaced with the actual query string.
+    """
+    template = os.environ.get("AGY_SEARCH_PROMPT", _DEFAULT_SEARCH_PROMPT)
+    return template.replace("{query}", query)
+
+
+def _get_extract_prompt(url: str) -> str:
+    """Build the extract prompt, using a custom template if set.
+
+    Override with the ``AGY_EXTRACT_PROMPT`` env var — ``{url}`` is
+    replaced with the actual URL.
+    """
+    template = os.environ.get("AGY_EXTRACT_PROMPT", _DEFAULT_EXTRACT_PROMPT)
+    return template.replace("{url}", url)
+
+
+# ---------------------------------------------------------------------------
+# v1.4.0 — Response caching
+# ---------------------------------------------------------------------------
+
+def _cache_get(key: str) -> Any | None:
+    """Return a cached result if still valid, else None."""
+    entry = _CACHE.get(key)
+    if entry is None:
+        return None
+    if time.time() - entry["ts"] > _CACHE_TTL_SECS:
+        del _CACHE[key]
+        return None
+    return entry["data"]
+
+
+def _cache_set(key: str, data: Any) -> None:
+    """Store a result in the cache."""
+    _CACHE[key] = {"ts": time.time(), "data": data}
+
+
+# ---------------------------------------------------------------------------
+# v1.5.0 — Rate limit awareness
+# ---------------------------------------------------------------------------
+
+def _check_quota(access_token: str, project: str) -> Dict[str, Any] | None:
+    """Call retrieveUserQuotaSummary to check remaining quota.
+
+    Returns a dict with ``remaining_fraction`` and ``reset_time`` or
+    None when the check fails.  Cached for 60 seconds to avoid
+    hammering the API on every search.
+    """
+    cache_key = f"quota:{project}"
+    cached = _QUOTA_CACHE.get(cache_key)
+    if cached and time.time() - cached["ts"] < _QUOTA_REFRESH_SECS:
+        return cached["data"]
+
+    headers = _api_headers(access_token)
+    body = json.dumps({"project": project})
+
+    try:
+        context = ssl.create_default_context()
+        conn = http.client.HTTPSConnection(_API_ENDPOINT, context=context, timeout=_TIMEOUT_SECS)
+        conn.request("POST", "/v1internal:retrieveUserQuotaSummary", body=body, headers=headers)
+        response = conn.getresponse()
+        raw_data = response.read()
+
+        content_encoding = response.getheader("Content-Encoding", "")
+        if "gzip" in content_encoding:
+            raw_data = gzip.decompress(raw_data)
+
+        if response.status != 200:
+            return None
+
+        data = json.loads(raw_data.decode("utf-8"))
+        buckets = []
+        for group in data.get("groups", []):
+            for bucket in group.get("buckets", []):
+                buckets.append({
+                    "id": bucket.get("bucketId", ""),
+                    "remaining": bucket.get("remainingFraction", 1.0),
+                    "reset_time": bucket.get("resetTime", ""),
+                    "display": bucket.get("displayName", ""),
+                })
+
+        result = {"buckets": buckets}
+        _QUOTA_CACHE[cache_key] = {"ts": time.time(), "data": result}
+        return result
+    except Exception:
+        return None
+
+
+def _is_rate_limited(quota: Dict[str, Any] | None) -> bool:
+    """Return True when any quota bucket is exhausted."""
+    if not quota:
+        return False
+    for bucket in quota.get("buckets", []):
+        if bucket.get("remaining", 1.0) <= 0:
+            return True
+    return False
+
+
 class AgYOAuthWebSearchProvider(WebSearchProvider):
     """Google Search provider via Antigravity OAuth.
 
@@ -375,6 +496,13 @@ class AgYOAuthWebSearchProvider(WebSearchProvider):
 
     def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
         """Execute a Google search via Gemini API with Search Grounding."""
+        # v1.4.0 — Check cache first
+        cache_key = f"search:{query}"
+        cached = _cache_get(cache_key)
+        if cached is not None:
+            logger.info("OAuth search '%s': cache hit", query)
+            return cached
+
         access_token = _get_valid_access_token()
         if not access_token:
             return {
@@ -384,7 +512,22 @@ class AgYOAuthWebSearchProvider(WebSearchProvider):
 
         try:
             project = _load_code_assist(access_token)
-            prompt = f'Search the web for: "{query}"'
+
+            # v1.5.0 — Check rate limit before making the call
+            quota = _check_quota(access_token, project)
+            if _is_rate_limited(quota):
+                reset = ""
+                for b in quota.get("buckets", []):
+                    if b.get("remaining", 1) <= 0:
+                        reset = b.get("reset_time", "")
+                        break
+                msg = "Rate limit reached"
+                if reset:
+                    msg += f" (resets at {reset})"
+                return {"success": False, "error": msg}
+
+            # v1.3.0 — Use configurable prompt template
+            prompt = _get_search_prompt(query)
             answer = _stream_generate_content(
                 access_token,
                 project,
@@ -402,8 +545,13 @@ class AgYOAuthWebSearchProvider(WebSearchProvider):
                 "position": 1,
             }]
 
+            result = {"success": True, "data": {"web": web_results}}
+
+            # v1.4.0 — Cache the result
+            _cache_set(cache_key, result)
+
             logger.info("OAuth search '%s': %d results", query, len(web_results))
-            return {"success": True, "data": {"web": web_results}}
+            return result
 
         except Exception as exc:
             logger.warning("OAuth search error: %s", exc)
@@ -417,21 +565,29 @@ class AgYOAuthWebSearchProvider(WebSearchProvider):
 
         results = []
         for url in urls:
+            # v1.4.0 — Check cache first
+            cache_key = f"extract:{url}"
+            cached = _cache_get(cache_key)
+            if cached is not None:
+                logger.info("OAuth extract '%s': cache hit", url)
+                results.append(cached)
+                continue
+
             try:
                 project = _load_code_assist(access_token)
-                prompt = (
-                    f'Extract the main text content from this URL: {url}\n\n'
-                    "Return ONLY the main article/text content. No HTML, no navigation, "
-                    "no ads, no menus. Just the readable text content."
-                )
+                # v1.3.0 — Use configurable prompt template
+                prompt = _get_extract_prompt(url)
                 content = _stream_generate_content(access_token, project, prompt)
-                results.append({
+                result = {
                     "url": url,
                     "title": "",
                     "content": content,
                     "raw_content": content,
                     "metadata": {"sourceURL": url},
-                })
+                }
+                # v1.4.0 — Cache the result
+                _cache_set(cache_key, result)
+                results.append(result)
             except Exception as exc:
                 logger.warning("OAuth extract error for %s: %s", url, exc)
                 results.append({"url": url, "title": "", "content": "", "error": str(exc)})

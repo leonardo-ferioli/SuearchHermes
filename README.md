@@ -408,9 +408,9 @@ class AgYWebSearchProvider(WebSearchProvider):
 - [x] v1.0.0 — Core plugin, installer, docs
 - [x] **v1.1.0** — Direct Gemini API integration via OAuth (bypass agy CLI)
 - [x] **v1.2.0** — Extract support (page content extraction via agy and OAuth)
-- [ ] **v1.3.0** — Configurable prompt template (let users customize the agy prompt)
-- [ ] **v1.4.0** — Response caching (avoid repeated searches within a session)
-- [ ] **v1.5.0** — Rate limit awareness (detect agy quota limits and surface gracefully)
+- [x] **v1.3.0** — Configurable prompt template (env vars: `AGY_SEARCH_PROMPT`, `AGY_EXTRACT_PROMPT`)
+- [x] **v1.4.0** — Response caching (5-minute TTL, avoids repeated searches within a session)
+- [x] **v1.5.0** — Rate limit awareness (checks `retrieveUserQuotaSummary` before search)
 
 ---
 

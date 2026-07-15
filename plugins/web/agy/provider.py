@@ -16,6 +16,7 @@ import logging
 import os
 import shutil
 import subprocess
+import time
 from typing import Any, Dict, List
 
 from agent.web_search_provider import WebSearchProvider
@@ -23,6 +24,24 @@ from agent.web_search_provider import WebSearchProvider
 logger = logging.getLogger(__name__)
 
 _AGY_TIMEOUT_SECS = 120
+
+# v1.3.0 — Configurable prompt templates (overridable via env vars)
+_DEFAULT_SEARCH_PROMPT = (
+    'Search the web for: "{query}"\n\n'
+    "Respond in this exact format and nothing else:\n\n"
+    "ANSWER: <one or two sentences answering the question, in English>\n"
+    "SOURCES: <comma-separated list of source domain names or clean URLs, "
+    "not vertexaisearch redirect links>"
+)
+_DEFAULT_EXTRACT_PROMPT = (
+    "Extract the main text content from this URL: {url}\n\n"
+    "Return ONLY the main article/text content. No HTML, no navigation, "
+    "no ads, no menus. Just the readable text content."
+)
+
+# v1.4.0 — Response caching
+_CACHE: Dict[str, Any] = {}
+_CACHE_TTL_SECS = 300  # 5 minutes
 
 
 def _find_agy() -> str | None:
@@ -64,6 +83,13 @@ class AgYWebSearchProvider(WebSearchProvider):
 
     def search(self, query: str, limit: int = 5) -> Dict[str, Any]:
         """Execute a Google search via agy and return normalized results."""
+        # v1.4.0 — Check cache first
+        cache_key = f"search:{query}"
+        cached = _CACHE.get(cache_key)
+        if cached and time.time() - cached["ts"] < _CACHE_TTL_SECS:
+            logger.info("agy search '%s': cache hit", query)
+            return cached["data"]
+
         agy_path = _find_agy()
         if not agy_path:
             return {
@@ -71,13 +97,9 @@ class AgYWebSearchProvider(WebSearchProvider):
                 "error": "agy binary not found — install with: curl -fsSL https://antigravity.google/cli/install.sh | bash",
             }
 
-        prompt = (
-            f'Search the web for: "{query}"\n\n'
-            "Respond in this exact format and nothing else:\n\n"
-            "ANSWER: <one or two sentences answering the question, in English>\n"
-            "SOURCES: <comma-separated list of source domain names or clean URLs, "
-            "not vertexaisearch redirect links>"
-        )
+        # v1.3.0 — Use configurable prompt template
+        template = os.environ.get("AGY_SEARCH_PROMPT", _DEFAULT_SEARCH_PROMPT)
+        prompt = template.replace("{query}", query)
 
         try:
             result = subprocess.run(
@@ -128,7 +150,10 @@ class AgYWebSearchProvider(WebSearchProvider):
             })
 
         logger.info("agy search '%s': %d results", query, len(web_results))
-        return {"success": True, "data": {"web": web_results}}
+        result = {"success": True, "data": {"web": web_results}}
+        # v1.4.0 — Cache the result
+        _CACHE[cache_key] = {"ts": time.time(), "data": result}
+        return result
 
     def extract(self, urls: list[str], **kwargs: Any) -> list[Dict[str, Any]]:
         """Extract content from one or more URLs via agy."""
@@ -138,11 +163,17 @@ class AgYWebSearchProvider(WebSearchProvider):
 
         results = []
         for url in urls:
-            prompt = (
-                f'Extract the main text content from this URL: {url}\n\n'
-                "Return ONLY the main article/text content. No HTML, no navigation, "
-                "no ads, no menus. Just the readable text content."
-            )
+            # v1.4.0 — Check cache first
+            cache_key = f"extract:{url}"
+            cached = _CACHE.get(cache_key)
+            if cached and time.time() - cached["ts"] < _CACHE_TTL_SECS:
+                logger.info("agy extract '%s': cache hit", url)
+                results.append(cached["data"])
+                continue
+
+            # v1.3.0 — Use configurable prompt template
+            template = os.environ.get("AGY_EXTRACT_PROMPT", _DEFAULT_EXTRACT_PROMPT)
+            prompt = template.replace("{url}", url)
             try:
                 result = subprocess.run(
                     [agy_path, "-p", prompt, "--dangerously-skip-permissions"],
@@ -153,13 +184,16 @@ class AgYWebSearchProvider(WebSearchProvider):
                 )
                 content = (result.stdout or "").strip()
                 if content:
-                    results.append({
+                    result = {
                         "url": url,
                         "title": "",
                         "content": content,
                         "raw_content": content,
                         "metadata": {"sourceURL": url},
-                    })
+                    }
+                    # v1.4.0 — Cache the result
+                    _CACHE[cache_key] = {"ts": time.time(), "data": result}
+                    results.append(result)
                 else:
                     results.append({"url": url, "title": "", "content": "", "error": "Empty response from agy"})
             except subprocess.TimeoutExpired:
