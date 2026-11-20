@@ -27,13 +27,24 @@ jobs:
           classes = [n.name for n in ast.walk(tree) if isinstance(n, ast.ClassDef)]
           assert 'AgYWebSearchProvider' in classes, 'AgYWebSearchProvider class not found'
           print('✓ provider.py valid')
-          with open('plugins/web/agy/__init__.py') as f:
-              ast.parse(f.read())
-          print('✓ __init__.py valid')
+          for module in ('__init__.py', 'oauth_provider.py'):
+              with open('plugins/web/agy/' + module) as f:
+                  ast.parse(f.read())
+              print('✓ ' + module + ' valid')
+          # Hermes only discovers plugins/web/<name>/ dirs that carry a manifest
+          with open('plugins/web/agy/plugin.yaml') as f:
+              manifest = f.read()
+          assert 'kind: backend' in manifest, 'plugin.yaml must declare kind: backend'
+          for provider in ('agy', 'agy-oauth'):
+              assert provider in manifest, 'provides_web_providers must list ' + provider
+          print('✓ plugin.yaml valid')
           with open('install.sh') as f:
               content = f.read()
               assert 'plugins/web/agy' in content
               assert 'search_backend: agy' in content
+              # Files are copied as a set: a hardcoded list silently drops modules
+              assert 'plugins/web/agy/\"*.py' in content, 'install.sh must copy every plugin file'
+              assert 'MINGW' in content, 'install.sh must handle Windows'
           print('✓ install.sh valid')
           print('All checks passed')
           "

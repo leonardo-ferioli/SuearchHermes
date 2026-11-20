@@ -1,0 +1,12 @@
+name: web-agy
+version: 1.5.0
+description: "Google Search via the Antigravity CLI (agy) with Gemini Search Grounding — no API key, no billing. Also exposes the 'agy-oauth' backend, which uses OAuth tokens directly."
+author: leonardo-ferioli
+kind: backend
+license: MIT
+homepage: https://github.com/leonardo-ferioli/SuearchHermes
+external_dependencies:
+  - agy
+provides_web_providers:
+  - agy
+  - agy-oauth
