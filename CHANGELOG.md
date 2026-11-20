@@ -5,6 +5,25 @@ All notable changes to SuearchHermes will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Plugin never loaded on current Hermes builds** — `plugin.yaml` was missing, and Hermes only
+  discovers `plugins/web/<name>/` directories that carry a manifest. Added
+  `plugins/web/agy/plugin.yaml` (`kind: backend`, `provides_web_providers` for both backends).
+- **Install failed with `ModuleNotFoundError: plugins.web.agy.oauth_provider`** — `install.sh`
+  copied `__init__.py` and `provider.py` only, while `__init__.py` imports the OAuth provider too.
+  It now copies every file in the plugin directory.
+- **Windows installed into a directory nothing reads** — `install.sh` hardcoded `~/.hermes`, but
+  Hermes uses `%LOCALAPPDATA%\hermes` on Windows. The default is now platform-aware
+  (`HERMES_HOME` still overrides it).
+- **Windows had no working install path** — `antigravity.google/cli/install.sh` is a Unix-only
+  bootstrapper and rejects `MINGW64_NT`. `install.sh` now detects Windows and fetches `agy.exe`
+  from Google's release manifest, verifying the published SHA-512.
+- **Config edits could duplicate the `web:` key** — the old script prepended a whole `web:` block
+  whenever `search_backend` was absent, even if `web:` already existed. It now prefers
+  `hermes config set` and, without the CLI, inserts into the existing block.
+
 ## [1.5.0] - 2026-07-14
 
 ### Added

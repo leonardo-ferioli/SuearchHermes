@@ -129,14 +129,17 @@ Hermes: Hermes Agent by Nous Research is an open-source autonomous AI agent
 
 ### Prerequisites
 
-1. **Hermes Agent** installed (`~/.hermes/hermes-agent/`)
-2. **Antigravity CLI** (`agy`) installed and authenticated:
+1. **Hermes Agent** installed. Your Hermes home is `~/.hermes` on Linux/macOS and
+   `%LOCALAPPDATA%\hermes` on Windows — the installer picks the right one, or set
+   `HERMES_HOME` to point it somewhere else.
+2. **Antigravity CLI** (`agy`) installed and authenticated — the installer fetches it on
+   Windows, and tells you the command on Linux/macOS:
 
 ```bash
 # Install agy
 curl -fsSL https://antigravity.google/cli/install.sh | bash
 
-# Authenticate with your Google account
+# Authenticate with your Google account (opens a browser)
 agy
 ```
 
@@ -150,18 +153,23 @@ cd SuearchHermes
 ./install.sh
 ```
 
-That's it. The script will:
-- ✅ Copy the plugin to `~/.hermes/hermes-agent/plugins/web/agy/`
-- ✅ Check that `agy` is installed
-- ✅ Add `web.search_backend: agy` to `~/.hermes/config.yaml`
+On Windows run the same thing from Git Bash. The script will:
+- ✅ Copy the plugin to `<hermes-home>/hermes-agent/plugins/web/agy/` — all of it, including
+  `plugin.yaml`, which is what makes Hermes list the plugin
+- ✅ Check that `agy` is installed (on Windows it downloads `agy.exe` and verifies Google's
+  SHA-512, since `antigravity.google/cli/install.sh` is a Unix-only bootstrapper)
+- ✅ Set `web.search_backend: agy` via `hermes config set` when the CLI is available
 
 ### Verify
 
 ```bash
-cd ~/.hermes/hermes-agent
-./venv/bin/python -c "from plugins.web.agy.provider import AgYWebSearchProvider; p = AgYWebSearchProvider(); print(p.name, p.is_available())"
-# Expected: agy True
+hermes plugins list          # expect a 'web-agy' row, enabled
+hermes config get web.search_backend   # expect: agy
 ```
+
+Restart Hermes after installing — plugin discovery is per-process, so the running app
+will not see the new backend until it reloads.
+
 
 ### Use
 
